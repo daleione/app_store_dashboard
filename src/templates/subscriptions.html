@@ -1,0 +1,179 @@
+{% extends "base.html" %}
+
+{% block title %}订阅信息 - App Store Dashboard{% endblock %}
+
+{% block content %}
+<div class="space-y-6 fade-in">
+    <header class="pb-4 border-b border-slate-200 dark:border-slate-700">
+        <h1 class="text-3xl font-semibold text-slate-900 dark:text-slate-100">查询订阅信息</h1>
+        <p class="mt-1 text-sm text-slate-600 dark:text-slate-400">查看您所有产品的订阅状态和详细信息。</p>
+    </header>
+
+    <!-- Charts Section -->
+    <section class="grid grid-cols-1 lg:grid-cols-2 gap-6">
+        <div class="bg-white dark:bg-slate-800 p-4 sm:p-6 rounded-lg shadow-sm content-card border border-transparent">
+            <h2 class="text-lg font-medium text-slate-900 dark:text-slate-100 mb-4">订阅状态分布</h2>
+            <div class="h-64 md:h-80"><canvas id="subscriptionStatusChart"></canvas></div>
+        </div>
+        <div class="bg-white dark:bg-slate-800 p-4 sm:p-6 rounded-lg shadow-sm content-card border border-transparent">
+            <h2 class="text-lg font-medium text-slate-900 dark:text-slate-100 mb-4">自动续订状态</h2>
+            <div class="h-64 md:h-80"><canvas id="autoRenewStatusChart"></canvas></div>
+        </div>
+    </section>
+
+    <!-- Subscriptions List -->
+    <section class="space-y-6">
+        {% if subscriptions %}
+            {% for sub_group in subscriptions %}
+            <div class="bg-white dark:bg-slate-800 shadow-sm rounded-lg overflow-hidden content-card border border-transparent">
+                <div class="p-4 sm:p-6 border-b border-slate-200 dark:border-slate-700">
+                    <h2 class="text-xl font-semibold text-slate-800 dark:text-slate-200">订阅组: {{ sub_group.subscriptionGroupIdentifier }}</h2>
+                </div>
+                {% if sub_group.transactions %}
+                    <div class="divide-y divide-slate-200 dark:divide-slate-700">
+                    {% for lt in sub_group.transactions %}
+                        <div class="p-4 sm:p-6 hover:bg-slate-50 dark:hover:bg-slate-700/50 transition-colors duration-150">
+                            <div class="grid grid-cols-1 md:grid-cols-2 gap-4 items-start">
+                                <div>
+                                    <h3 class="text-md font-medium text-indigo-600 dark:text-indigo-400">{{ lt.signedTransactionInfo.productId }}</h3>
+                                    <p class="text-xs text-slate-500 dark:text-slate-400">交易ID: {{ lt.signedTransactionInfo.transactionId }}</p>
+                                    <p class="text-xs text-slate-500 dark:text-slate-400">原始交易ID: {{ lt.originalTransactionId }}</p>
+                                </div>
+                                <div class="text-left md:text-right">
+                                    <span class="px-3 py-1 inline-flex text-sm leading-5 font-semibold rounded-full 
+                                        {% if lt.status == 1 %} bg-green-100 text-green-800 dark:bg-green-700 dark:text-green-100 %}
+                                        {% elif lt.status == 2 %} bg-red-100 text-red-800 dark:bg-red-700 dark:text-red-100 %}
+                                        {% elif lt.status == 3 %} bg-yellow-100 text-yellow-800 dark:bg-yellow-600 dark:text-yellow-100 %}
+                                        {% elif lt.status == 4 %} bg-blue-100 text-blue-800 dark:bg-blue-700 dark:text-blue-100 %}
+                                        {% else %} bg-slate-100 text-slate-800 dark:bg-slate-600 dark:text-slate-100 {% endif %}">
+                                        {{ lt.statusFormatted }}
+                                    </span>
+                                </div>
+                            </div>
+                            
+                            <div class="mt-4 grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-x-4 gap-y-2 text-sm">
+                                <div class="text-slate-700 dark:text-slate-300"><strong class="font-medium text-slate-500 dark:text-slate-400">购买日期:</strong> {{ lt.signedTransactionInfo.purchaseDateFormatted }}</div>
+                                <div class="text-slate-700 dark:text-slate-300"><strong class="font-medium text-slate-500 dark:text-slate-400">到期日期:</strong> {{ lt.signedTransactionInfo.expiresDateFormatted }}</div>
+                                <div class="text-slate-700 dark:text-slate-300"><strong class="font-medium text-slate-500 dark:text-slate-400">价格:</strong> {{ lt.signedTransactionInfo.priceFormatted }}</div>
+                                
+                                {% if lt.signedRenewalInfo %}
+                                <div class="text-slate-700 dark:text-slate-300"><strong class="font-medium text-slate-500 dark:text-slate-400">自动续订:</strong> {{ lt.signedRenewalInfo.autoRenewStatusFormatted }}</div>
+                                <div class="text-slate-700 dark:text-slate-300"><strong class="font-medium text-slate-500 dark:text-slate-400">续订产品ID:</strong> {{ lt.signedRenewalInfo.autoRenewProductId }}</div>
+                                    {% if lt.signedRenewalInfo.gracePeriodExpiresDateFormatted != "N/A" %}
+                                    <div class="text-slate-700 dark:text-slate-300"><strong class="font-medium text-slate-500 dark:text-slate-400">宽限期至:</strong> {{ lt.signedRenewalInfo.gracePeriodExpiresDateFormatted }}</div>
+                                    {% endif %}
+                                {% endif %}
+                                <div class="text-slate-700 dark:text-slate-300"><strong class="font-medium text-slate-500 dark:text-slate-400">环境:</strong> 
+                                    <span class="px-2 inline-flex text-xs leading-5 font-semibold rounded-full 
+                                        {% if lt.signedTransactionInfo.environment == 'Production' %} bg-green-100 text-green-800 dark:bg-green-700 dark:text-green-100 
+                                        {% else %} bg-yellow-100 text-yellow-800 dark:bg-yellow-600 dark:text-yellow-100 {% endif %}">
+                                        {{ lt.signedTransactionInfo.environment }}
+                                    </span>
+                                </div>
+                            </div>
+                        </div>
+                    {% endfor %}
+                    </div>
+                {% else %}
+                    <p class="p-4 sm:p-6 text-slate-500 dark:text-slate-400">此订阅组没有交易记录。</p>
+                {% endif %}
+            </div>
+            {% endfor %}
+        {% else %}
+            <div class="bg-white dark:bg-slate-800 shadow-sm rounded-lg p-10 text-center content-card border border-transparent">
+                <p class="text-slate-500 dark:text-slate-400">没有找到订阅信息。</p>
+            </div>
+        {% endif %}
+    </section>
+</div>
+
+<script>
+document.addEventListener("DOMContentLoaded", function() {
+    const subscriptionsData = {{ subscriptions|tojson }};
+    const isDarkMode = document.documentElement.classList.contains("dark");
+    const chartFontColor = isDarkMode ? "#e2e8f0" : "#334155";
+    const gridColor = isDarkMode ? "rgba(71, 85, 105, 0.5)" : "rgba(203, 213, 225, 0.5)";
+
+    let allTransactions = [];
+    subscriptionsData.forEach(group => {
+        allTransactions = allTransactions.concat(group.transactions || []);
+    });
+
+    // Subscription Status Chart (Pie)
+    const statusCounts = allTransactions.reduce((acc, lt) => {
+        const status = lt.statusFormatted || "Unknown";
+        acc[status] = (acc[status] || 0) + 1;
+        return acc;
+    }, {});
+    const subStatusCtx = document.getElementById("subscriptionStatusChart").getContext("2d");
+    new Chart(subStatusCtx, {
+        type: "pie",
+        data: {
+            labels: Object.keys(statusCounts),
+            datasets: [{
+                label: "订阅状态",
+                data: Object.values(statusCounts),
+                backgroundColor: [
+                    "rgba(16, 185, 129, 0.7)", // Emerald (Active)
+                    "rgba(239, 68, 68, 0.7)",  // Red (Expired)
+                    "rgba(245, 158, 11, 0.7)", // Amber (Billing Retry)
+                    "rgba(59, 130, 246, 0.7)", // Blue (Grace Period)
+                    "rgba(107, 114, 128, 0.7)" // Gray (Revoked/Unknown)
+                ],
+                borderColor: isDarkMode ? "#1e293b" : "#ffffff",
+                borderWidth: 2
+            }]
+        },
+        options: {
+            responsive: true,
+            maintainAspectRatio: false,
+            plugins: {
+                legend: { position: "bottom", labels: { color: chartFontColor } }
+            }
+        }
+    });
+
+    // Auto-Renew Status Chart (Bar)
+    const autoRenewCounts = allTransactions.reduce((acc, lt) => {
+        if (lt.signedRenewalInfo) {
+            const renewStatus = lt.signedRenewalInfo.autoRenewStatusFormatted || "Unknown";
+            acc[renewStatus] = (acc[renewStatus] || 0) + 1;
+        }
+        return acc;
+    }, {});
+    const autoRenewCtx = document.getElementById("autoRenewStatusChart").getContext("2d");
+    new Chart(autoRenewCtx, {
+        type: "bar",
+        data: {
+            labels: Object.keys(autoRenewCounts),
+            datasets: [{
+                label: "自动续订状态数量",
+                data: Object.values(autoRenewCounts),
+                backgroundColor: [
+                    "rgba(79, 70, 229, 0.7)", // Indigo (Will Renew)
+                    "rgba(219, 39, 119, 0.7)"  // Pink (Turned Off)
+                ],
+                borderColor: [
+                    "rgba(79, 70, 229, 1)",
+                    "rgba(219, 39, 119, 1)"
+                ],
+                borderWidth: 1
+            }]
+        },
+        options: {
+            responsive: true,
+            maintainAspectRatio: false,
+            indexAxis: 'y',
+            scales: {
+                x: { beginAtZero: true, ticks: { color: chartFontColor, stepSize: 1 }, grid: { color: gridColor } },
+                y: { ticks: { color: chartFontColor }, grid: { display: false } }
+            },
+            plugins: {
+                legend: { display: false }
+            }
+        }
+    });
+});
+</script>
+{% endblock %}
+

@@ -1,0 +1,175 @@
+{% extends "base.html" %}
+
+{% block title %}历史交易 - App Store Dashboard{% endblock %}
+
+{% block content %}
+<div class="space-y-6 fade-in">
+    <header class="pb-4 border-b border-slate-200 dark:border-slate-700">
+        <h1 class="text-3xl font-semibold text-slate-900 dark:text-slate-100">查询所有历史交易</h1>
+        <p class="mt-1 text-sm text-slate-600 dark:text-slate-400">查看您的所有应用内购买和订阅交易记录。</p>
+    </header>
+
+    <!-- Charts Section -->
+    <section class="grid grid-cols-1 lg:grid-cols-2 gap-6">
+        <div class="bg-white dark:bg-slate-800 p-4 sm:p-6 rounded-lg shadow-sm content-card border border-transparent">
+            <h2 class="text-lg font-medium text-slate-900 dark:text-slate-100 mb-4">交易类型分布</h2>
+            <div class="h-64 md:h-80"><canvas id="transactionTypeChart"></canvas></div>
+        </div>
+        <div class="bg-white dark:bg-slate-800 p-4 sm:p-6 rounded-lg shadow-sm content-card border border-transparent">
+            <h2 class="text-lg font-medium text-slate-900 dark:text-slate-100 mb-4">月度交易额趋势 (USD)</h2>
+            <div class="h-64 md:h-80"><canvas id="monthlyRevenueChart"></canvas></div>
+        </div>
+    </section>
+
+    <!-- Transactions Table -->
+    <section class="bg-white dark:bg-slate-800 shadow-sm rounded-lg overflow-hidden content-card border border-transparent">
+        <div class="p-4 sm:p-6 border-b border-slate-200 dark:border-slate-700">
+            <h2 class="text-lg font-medium text-slate-900 dark:text-slate-100">交易列表</h2>
+            <!-- Add search/filter options here later if needed -->
+        </div>
+        <div class="overflow-x-auto">
+            <table class="min-w-full divide-y divide-slate-200 dark:divide-slate-700">
+                <thead class="bg-slate-50 dark:bg-slate-700/50">
+                    <tr>
+                        <th scope="col" class="px-4 py-3 text-left text-xs font-medium text-slate-500 dark:text-slate-400 uppercase tracking-wider whitespace-nowrap">交易ID</th>
+                        <th scope="col" class="px-4 py-3 text-left text-xs font-medium text-slate-500 dark:text-slate-400 uppercase tracking-wider whitespace-nowrap">产品ID</th>
+                        <th scope="col" class="px-4 py-3 text-left text-xs font-medium text-slate-500 dark:text-slate-400 uppercase tracking-wider whitespace-nowrap">类型</th>
+                        <th scope="col" class="px-4 py-3 text-left text-xs font-medium text-slate-500 dark:text-slate-400 uppercase tracking-wider whitespace-nowrap">购买日期 (北京时间)</th>
+                        <th scope="col" class="px-4 py-3 text-left text-xs font-medium text-slate-500 dark:text-slate-400 uppercase tracking-wider whitespace-nowrap">价格</th>
+                        <th scope="col" class="px-4 py-3 text-left text-xs font-medium text-slate-500 dark:text-slate-400 uppercase tracking-wider whitespace-nowrap">数量</th>
+                        <th scope="col" class="px-4 py-3 text-left text-xs font-medium text-slate-500 dark:text-slate-400 uppercase tracking-wider whitespace-nowrap">环境</th>
+                    </tr>
+                </thead>
+                <tbody class="bg-white dark:bg-slate-800 divide-y divide-slate-200 dark:divide-slate-700">
+                    {% if transactions %}
+                        {% for t in transactions %}
+                        <tr class="hover:bg-slate-50 dark:hover:bg-slate-700/50 transition-colors duration-150">
+                            <td class="px-4 py-3 text-sm text-slate-700 dark:text-slate-300 whitespace-nowrap">{{ t.transactionId }}</td>
+                            <td class="px-4 py-3 text-sm text-slate-700 dark:text-slate-300 whitespace-nowrap">{{ t.productId }}</td>
+                            <td class="px-4 py-3 text-sm text-slate-700 dark:text-slate-300 whitespace-nowrap">{{ t.type }}</td>
+                            <td class="px-4 py-3 text-sm text-slate-700 dark:text-slate-300 whitespace-nowrap">{{ t.purchaseDateFormatted }}</td>
+                            <td class="px-4 py-3 text-sm text-slate-700 dark:text-slate-300 whitespace-nowrap">{{ t.priceFormatted }}</td>
+                            <td class="px-4 py-3 text-sm text-slate-700 dark:text-slate-300 whitespace-nowrap text-center">{{ t.quantity }}</td>
+                            <td class="px-4 py-3 text-sm text-slate-700 dark:text-slate-300 whitespace-nowrap">
+                                <span class="px-2 inline-flex text-xs leading-5 font-semibold rounded-full 
+                                    {% if t.environment == 'Production' %} bg-green-100 text-green-800 dark:bg-green-700 dark:text-green-100 
+                                    {% else %} bg-yellow-100 text-yellow-800 dark:bg-yellow-600 dark:text-yellow-100 {% endif %}">
+                                    {{ t.environment }}
+                                </span>
+                            </td>
+                        </tr>
+                        {% endfor %}
+                    {% else %}
+                        <tr>
+                            <td colspan="7" class="px-4 py-10 text-center text-sm text-slate-500 dark:text-slate-400">
+                                没有找到交易记录。
+                            </td>
+                        </tr>
+                    {% endif %}
+                </tbody>
+            </table>
+        </div>
+        <!-- Pagination could be added here -->
+    </section>
+</div>
+
+<script>
+    document.addEventListener("DOMContentLoaded", function() {
+        const transactionsData = {{ transactions|tojson }};
+        const isDarkMode = document.documentElement.classList.contains("dark");
+        const chartFontColor = isDarkMode ? "#e2e8f0" : "#334155"; // slate-200 : slate-700
+        const gridColor = isDarkMode ? "rgba(71, 85, 105, 0.5)" : "rgba(203, 213, 225, 0.5)"; // slate-600/50 : slate-300/50
+
+        // Transaction Type Chart (Pie)
+        const typeCounts = transactionsData.reduce((acc, t) => {
+            acc[t.type] = (acc[t.type] || 0) + 1;
+            return acc;
+        }, {});
+        const transactionTypeCtx = document.getElementById("transactionTypeChart").getContext("2d");
+        new Chart(transactionTypeCtx, {
+            type: "pie",
+            data: {
+                labels: Object.keys(typeCounts),
+                datasets: [{
+                    label: "交易类型",
+                    data: Object.values(typeCounts),
+                    backgroundColor: [
+                        "rgba(79, 70, 229, 0.7)", // Indigo
+                        "rgba(59, 130, 246, 0.7)", // Blue
+                        "rgba(16, 185, 129, 0.7)", // Emerald
+                        "rgba(245, 158, 11, 0.7)"  // Amber
+                    ],
+                    borderColor: isDarkMode ? "#1e293b" : "#ffffff", // slate-800 : white
+                    borderWidth: 2
+                }]
+            },
+            options: {
+                responsive: true,
+                maintainAspectRatio: false,
+                plugins: {
+                    legend: {
+                        position: "bottom",
+                        labels: { color: chartFontColor }
+                    }
+                }
+            }
+        });
+
+        // Monthly Revenue Chart (Line)
+        // Assuming 'price' is in smallest currency unit (e.g. cents) and 'currency' is USD for simplicity here
+        // For a real app, you'd convert all to a base currency
+        const monthlyRevenue = transactionsData.reduce((acc, t) => {
+            if (t.currency === 'USD') {
+                const date = new Date(t.purchaseDate);
+                const monthYear = `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, '0')}`;
+                acc[monthYear] = (acc[monthYear] || 0) + (t.price / 100); // Convert cents to dollars
+            }
+            return acc;
+        }, {});
+        const sortedMonths = Object.keys(monthlyRevenue).sort();
+        const monthlyRevenueCtx = document.getElementById("monthlyRevenueChart").getContext("2d");
+        new Chart(monthlyRevenueCtx, {
+            type: "line",
+            data: {
+                labels: sortedMonths,
+                datasets: [{
+                    label: "月度交易额 (USD)",
+                    data: sortedMonths.map(month => monthlyRevenue[month]),
+                    fill: true,
+                    backgroundColor: "rgba(79, 70, 229, 0.1)",
+                    borderColor: "rgba(79, 70, 229, 1)",
+                    tension: 0.3,
+                    pointBackgroundColor: "rgba(79, 70, 229, 1)",
+                    pointBorderColor: isDarkMode ? "#1e293b" : "#ffffff",
+                    pointHoverBackgroundColor: isDarkMode ? "#1e293b" : "#ffffff",
+                    pointHoverBorderColor: "rgba(79, 70, 229, 1)"
+                }]
+            },
+            options: {
+                responsive: true,
+                maintainAspectRatio: false,
+                scales: {
+                    y: {
+                        beginAtZero: true,
+                        ticks: { 
+                            color: chartFontColor,
+                            callback: function(value) { return '$' + value; }
+                        },
+                        grid: { color: gridColor }
+                    },
+                    x: {
+                        ticks: { color: chartFontColor },
+                        grid: { color: gridColor }
+                    }
+                },
+                plugins: {
+                    legend: {
+                        display: false
+                    }
+                }
+            }
+        });
+    });
+</script>
+{% endblock %}
+
