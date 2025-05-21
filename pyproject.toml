@@ -1,0 +1,14 @@
+[project]
+name = "app-store-dashboard"
+version = "0.1.0"
+description = "app store dashboard"
+readme = "README.md"
+requires-python = ">=3.13"
+dependencies = [
+    "cryptography==36.0.2",
+    "flask==3.1.0",
+    "flask-sqlalchemy==3.1.1",
+    "pymysql==1.1.1",
+    "pytz>=2025.2",
+    "sqlalchemy==2.0.40",
+]
